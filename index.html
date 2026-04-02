@@ -449,12 +449,13 @@ const PUZZLES = [
     hint:"Think beyond just on and off – light bulbs have more than one detectable property.",
     keywords:["warm","heat","temperature","switch 1","switch 2","switch 3"]
   },
-  { id:2, letter:"E", type:"short", emoji:"🔤", title:"The Scrambled Letters",
-    q:"Rearrange the letters to find a valid English word: S I L E N T",
-    a:["listen","tinsel","enlist","inlets","silent"],
-    hint:"Think of something you do with your ears."
+  { id:2, letter:"E", type:"anagram", emoji:"🔤", title:"The Scrambled Letters",
+    q:"Rearrange ALL the letters in the phrase below to form a valid English word or phrase:\n\nU R I N A T I N G   O M E N",
+    a:"mountaineering",
+    hint:"Think of something adventurous you might do in the Alps.",
+    keywords:["mountaineering","mountain"]
   },
-  { id:3, letter:"P", type:"short", emoji:"🗺️", title:"The Riddle of Everywhere",
+  { id:3, letter:"P", type:"short", emoji:"🧩", title:"The Riddle of Everywhere",
     q:"I have cities, but no houses live there. I have mountains, but no trees grow there. I have water, but no fish swim there. I have roads, but no cars drive there. What am I?",
     a:["a map","map"],
     hint:"I show the world, but I am not the world."
@@ -469,7 +470,7 @@ const PUZZLES = [
     a:["9","nine"],
     hint:"Read every single word very carefully. The answer is hiding in plain sight."
   },
-  { id:6, letter:"K", type:"short", emoji:"⏳", title:"The Invisible Force",
+  { id:6, letter:"K", type:"short", emoji:"🌀", title:"The Invisible Thing",
     q:"I am always in front of you but cannot be seen. I can be wasted or saved, but never bought back. I have no shape, no colour, no sound. What am I?",
     a:["time","the future","future"],
     hint:"Everyone has exactly the same amount of me each day."
@@ -480,7 +481,7 @@ const PUZZLES = [
     hint:"The wrongly labelled 'Empty' box is your key starting point – work from there.",
     keywords:["empty","chocolate","candy","label","wrong","pick"]
   },
-  { id:8, letter:"A", type:"short", emoji:"✉️", title:"The 8-Letter Mystery",
+  { id:8, letter:"A", type:"short", emoji:"🎭", title:"The 8-Letter Mystery",
     q:"What 8-letter word has one letter in it?",
     a:["envelope","an envelope"],
     hint:"The answer is something you send, not something you say."
@@ -490,7 +491,7 @@ const PUZZLES = [
     a:["42"],
     hint:"Try multiplying consecutive whole numbers instead of just adding."
   },
-  { id:10, letter:"N", type:"short", emoji:"👣", title:"The Paradox",
+  { id:10, letter:"N", type:"short", emoji:"🌫️", title:"The Paradox",
     q:"The more you take, the more you leave behind. What am I?",
     a:["footsteps","steps","a footstep","foot steps"],
     hint:"The more you do it, the more you leave a trace – but the trace is not something you can pick up."
@@ -759,7 +760,7 @@ function renderPuzzle(idx) {
           <span style="font-size:1.6rem">${p.emoji}</span>
           <div>
             <h3 style="margin:0;color:#333;font-size:1.15rem">${p.title}</h3>
-            <p style="margin:0;font-size:.72rem;color:#aaa">Puzzle ${idx+1} of 10 · Unlocks: <strong class="text-pink">${p.letter}</strong></p>
+            <p style="margin:0;font-size:.72rem;color:#aaa">Puzzle ${idx+1} of 10${solved ? ` · Unlocked: <strong style="color:#ff6b9d">${p.letter}</strong>` : ""}</p>
           </div>
         </div>
       </div>
@@ -855,6 +856,10 @@ async function submitAnswer(idx) {
 
   if (p.type === "long") {
     const result = await checkLongAnswer(p.id, answer, p.a, p.keywords);
+    correct = result.correct;
+    feedbackMsg = result.feedback;
+  } else if (p.type === "anagram") {
+    const result = await checkAnagramAnswer(answer, p.a);
     correct = result.correct;
     feedbackMsg = result.feedback;
   } else {
@@ -971,7 +976,24 @@ async function callClaude(prompt, system) {
   } catch { return ""; }
 }
 
-async function checkLongAnswer(puzzleId, userAnswer, correctAnswer, keywords) {
+async function checkAnagramAnswer(userAnswer, correctAnswer) {
+  const system = `You are a strict anagram judge. The source phrase is "URINATING OMEN" (14 letters: U,R,I,N,A,T,I,N,G,O,M,E,N,I — wait, let's be precise: U,R,I,N,A,T,I,N,G,O,M,E,N = 13 letters... actually the letters are: U-R-I-N-A-T-I-N-G-O-M-E-N = 13 letters).
+The intended answer is "MOUNTAINEERING".
+Check: does the user's answer use exactly the same letters as "URINATING OMEN" (ignoring spaces and case)?
+Also accept if it is a valid well-known English word/phrase that is a true anagram of "URINATING OMEN".
+Respond ONLY with valid JSON (no markdown): {"correct": true/false, "feedback": "short message"}`;
+  const prompt = `The anagram phrase is: "URINATING OMEN"
+The intended answer is: "mountaineering"
+The student answered: "${userAnswer}"
+Is this correct?`;
+  try {
+    const raw = await callClaude(prompt, system);
+    const clean = raw.replace(/```json|```/g,"").trim();
+    return JSON.parse(clean);
+  } catch { return { correct: false, feedback: "Hmm, couldn't check that. Try again!" }; }
+}
+
+
   const system = `You are a strict but fair Easter-themed quiz judge.
 Check if the student's answer captures the ESSENTIAL LOGIC of the correct answer.
 Respond ONLY with valid JSON (no markdown): {"correct": true/false, "feedback": "short message"}
