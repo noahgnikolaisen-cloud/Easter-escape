@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>🐰 Easter Escape Room</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js" defer></script>
+
+<!-- ─── FIREBASE ─────────────────────────────────────────────────────────── -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import {
+  getDatabase, ref, set, get, update, onValue, push, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+// ════════════════════════════════════════════════════════════════════════════
+//  🔧 FIREBASE CONFIG — Replace with YOUR project's config from Firebase Console
+//  https://console.firebase.google.com → Project Settings → Your apps → SDK setup
+// ════════════════════════════════════════════════════════════════════════════
+const firebaseConfig = {
+  apiKey:            "AIzaSyB5fbT5cPfPvOT66VAARxJ8TxVzrzMUIuA",
+  authDomain:        "paskeleker.firebaseapp.com",
+  databaseURL:       "https://paskeleker-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:         "paskeleker",
+  storageBucket:     "paskeleker.firebasestorage.app",
+  messagingSenderId: "32722470283",
+  appId:             "1:32722470283:web:ece4c9be60ead6500f5b8e"
+};
+
+const app = initializeApp(firebaseConfig);
+const db  = getDatabase(app);
+
+// ─── Expose Firebase helpers to non-module code ───────────────────────────
+window._fb = { db, ref, set, get, update, onValue, push };
+window._fbReady = true;
+window.dispatchEvent(new Event("fbReady"));
+</script>
+
+<style>
+  /* ─── RESET & BASE ─────────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; font-family: Georgia, 'Times New Roman', serif; }
+
+  body {
+    background: linear-gradient(135deg, #fff9f0 0%, #fff0f5 50%, #f0fff4 100%);
+    min-height: 100vh;
+    color: #333;
+  }
+
+  /* ─── ANIMATIONS ───────────────────────────────────────────────────────── */
+  @keyframes floatBg  { 0%,100%{transform:translateY(0) rotate(0deg)} 50%{transform:translateY(-18px) rotate(6deg)} }
+  @keyframes popIn    { 0%{transform:scale(0.85);opacity:0} 100%{transform:scale(1);opacity:1} }
+  @keyframes slideUp  { 0%{transform:translateY(28px);opacity:0} 100%{transform:translateY(0);opacity:1} }
+  @keyframes bounce   { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+  @keyframes spin     { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} }
+  @keyframes pulse    { 0%,100%{opacity:1} 50%{opacity:0.5} }
+  @keyframes shimmer  {
+    0%   { background-position: 200% center }
+    100% { background-position: -200% center }
+  }
+  @keyframes confetti {
+    0%   { transform: translateY(-10px) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+  }
+
+  /* ─── BG EMOJIS ────────────────────────────────────────────────────────── */
+  .bg-layer {
+    position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none;
+  }
+  .bg-emoji {
+    position: absolute; font-size: 2rem; opacity: 0.1; user-select: none;
+    animation: floatBg 5s ease-in-out infinite;
+  }
+
+  /* ─── CARD ─────────────────────────────────────────────────────────────── */
+  .card {
+    background: rgba(255,255,255,0.93);
+    backdrop-filter: blur(14px);
+    border-radius: 24px;
+    padding: 28px;
+    box-shadow: 0 8px 40px rgba(255,182,193,0.22), 0 2px 10px rgba(0,0,0,0.05);
+    border: 1.5px solid rgba(255,182,193,0.28);
+    animation: popIn 0.35s ease;
+    position: relative; z-index: 1;
+  }
+
+  /* ─── BUTTONS ──────────────────────────────────────────────────────────── */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    gap: 6px; border: none; border-radius: 16px; padding: 14px 28px;
+    font-size: 1rem; font-weight: 700; cursor: pointer; color: #fff;
+    font-family: inherit; transition: transform 0.15s, box-shadow 0.15s;
+    width: 100%;
+  }
+  .btn:hover:not(:disabled) { transform: translateY(-2px); }
+  .btn:disabled { background: #ddd !important; color: #aaa; cursor: not-allowed; box-shadow: none !important; transform: none !important; }
+  .btn-pink   { background: linear-gradient(135deg,#ff6b9d,#ff8eb3); box-shadow: 0 4px 16px #ff6b9d44; }
+  .btn-orange { background: linear-gradient(135deg,#ffb347,#ffc96b); box-shadow: 0 4px 16px #ffb34744; }
+  .btn-green  { background: linear-gradient(135deg,#7ec8a4,#9edad4); box-shadow: 0 4px 16px #7ec8a444; }
+  .btn-purple { background: linear-gradient(135deg,#c97ef7,#e0a0ff); box-shadow: 0 4px 16px #c97ef744; }
+  .btn-grey   { background: linear-gradient(135deg,#bbb,#ccc); box-shadow: none; }
+  .btn-sm     { padding: 8px 18px; font-size: 0.85rem; border-radius: 12px; width: auto; }
+
+  /* ─── INPUT ────────────────────────────────────────────────────────────── */
+  input, textarea {
+    width: 100%; padding: 14px 18px; border-radius: 14px;
+    border: 2px solid rgba(255,182,193,0.45); outline: none;
+    font-size: 1rem; font-family: inherit;
+    background: rgba(255,255,255,0.9); color: #333;
+    transition: border-color 0.2s;
+  }
+  input:focus, textarea:focus { border-color: #ff6b9d; }
+  textarea { min-height: 100px; resize: vertical; }
+
+  /* ─── SCREENS ──────────────────────────────────────────────────────────── */
+  .screen {
+    display: none; min-height: 100vh;
+    align-items: center; justify-content: center;
+    flex-direction: column; padding: 20px;
+  }
+  .screen.active { display: flex; }
+
+  .center-wrap { max-width: 440px; width: 100%; position: relative; z-index: 1; }
+
+  /* ─── HERO ─────────────────────────────────────────────────────────────── */
+  .hero { text-align: center; margin-bottom: 32px; animation: slideUp 0.6s ease; }
+  .hero-bunny { font-size: 4.5rem; animation: bounce 2.5s ease infinite; display: block; }
+  .hero-title {
+    font-size: 2.6rem; font-weight: 900; margin: 6px 0 2px;
+    background: linear-gradient(135deg,#ff6b9d,#ffb347);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .hero-sub { color: #b08860; font-size: 1rem; }
+
+  /* ─── GAME HEADER ──────────────────────────────────────────────────────── */
+  #game-header {
+    position: sticky; top: 0; z-index: 10;
+    background: rgba(255,255,255,0.96); backdrop-filter: blur(12px);
+    border-bottom: 1.5px solid rgba(255,182,193,0.25);
+    padding: 10px 16px;
+  }
+  .header-inner {
+    max-width: 620px; margin: 0 auto;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 8px;
+  }
+  .header-title { font-weight: 700; color: #ff6b9d; font-size: 1.1rem; }
+  .header-code  { margin-left: 8px; color: #bbb; font-size: 0.78rem; }
+  .badge {
+    border-radius: 10px; padding: 6px 14px;
+    font-weight: 700; font-size: 1rem;
+  }
+  .badge-timer { background: linear-gradient(135deg,#fff0f5,#fff9f0); color: #ff6b9d; font-variant-numeric: tabular-nums; }
+  .badge-solved { background: #fff0f5; color: #ff6b9d; font-size: 0.9rem; }
+  .badge-escaped { background: #f0fff4; color: #2d8a4a; }
+
+  /* ─── GAME BODY ────────────────────────────────────────────────────────── */
+  #game-body { max-width: 620px; margin: 0 auto; padding: 16px; }
+
+  /* ─── LETTER TILES ─────────────────────────────────────────────────────── */
+  .letter-tile {
+    width: 36px; height: 40px; display: inline-flex;
+    align-items: center; justify-content: center;
+    border-radius: 9px; font-weight: 900; font-size: 1.1rem;
+    background: #f0f0f0; color: #ccc;
+    transition: all 0.4s; flex-shrink: 0;
+  }
+  .letter-tile.unlocked {
+    background: linear-gradient(135deg,#ff6b9d,#ffb347);
+    color: #fff; box-shadow: 0 3px 10px #ff6b9d44;
+  }
+
+  /* ─── PUZZLE TABS ──────────────────────────────────────────────────────── */
+  .tabs-row {
+    display: flex; gap: 6px; overflow-x: auto;
+    padding-bottom: 8px; scrollbar-width: none;
+  }
+  .tabs-row::-webkit-scrollbar { display: none; }
+  .tab-btn {
+    flex-shrink: 0; padding: 8px 13px; border-radius: 12px;
+    border: 2px solid rgba(255,182,193,0.3);
+    background: rgba(255,255,255,0.9); color: #666;
+    font-size: 1.2rem; cursor: pointer; font-family: inherit;
+    transition: all 0.2s; position: relative;
+  }
+  .tab-btn.active  { background: #ff6b9d; border-color: #ff6b9d; color: #fff; }
+  .tab-btn.solved  { background: #f0fff4; color: #2d8a4a; }
+  .tab-check {
+    position: absolute; top: -4px; right: -4px;
+    background: #2d8a4a; color: #fff; border-radius: 50%;
+    width: 14px; height: 14px; font-size: 0.55rem;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* ─── FEEDBACK BOXES ───────────────────────────────────────────────────── */
+  .fb-success { background:#f0fff4; border:1.5px solid #7ec8a4; color:#2d8a4a; border-radius:12px; padding:12px 16px; font-size:.9rem; animation:popIn .3s ease; }
+  .fb-error   { background:#fff0f0; border:1.5px solid #ffb3b3; color:#cc4444; border-radius:12px; padding:12px 16px; font-size:.9rem; animation:popIn .3s ease; }
+
+  /* ─── CLUCKY BUBBLE ────────────────────────────────────────────────────── */
+  .clucky-bubble {
+    background: linear-gradient(135deg,#fff9f0,#fff0f5);
+    border-radius: 16px; padding: 14px 16px;
+    border: 2px solid #ffb34733; animation: popIn 0.3s ease;
+    display: flex; gap: 10px; align-items: flex-start;
+  }
+  .clucky-text { color:#b08860; font-style:italic; font-size:.95rem; line-height:1.5; }
+
+  /* ─── LOBBY PLAYER ROW ─────────────────────────────────────────────────── */
+  .player-row {
+    display: flex; align-items: center; gap: 12px;
+    border-radius: 12px; padding: 10px 14px;
+    animation: slideUp 0.3s ease;
+  }
+  .player-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+
+  /* ─── LEADERBOARD ──────────────────────────────────────────────────────── */
+  .lb-row {
+    display: flex; align-items: center; gap: 10px;
+    border-radius: 12px; padding: 10px 14px; border: 1.5px solid #f0f0f0;
+    background: #fafafa;
+  }
+  .lb-row.me { background:#fff0f5; border-color:#ff6b9d55; }
+
+  /* ─── HINT BOX ─────────────────────────────────────────────────────────── */
+  .hint-box {
+    background: linear-gradient(135deg,#fff9e6,#fff3d0);
+    border-radius: 12px; padding: 12px 16px;
+    border: 1.5px solid #ffb34755; animation: popIn 0.3s ease;
+    color: #b08820; font-size: .9rem;
+  }
+
+  /* ─── CODE DISPLAY ─────────────────────────────────────────────────────── */
+  .code-display {
+    background: linear-gradient(135deg,#fff0f5,#fff9f0);
+    border-radius: 14px; padding: 14px; text-align: center;
+  }
+  .code-label { color:#b08860; font-size:.8rem; font-weight:700; }
+  .code-value { font-size:2.4rem; font-weight:900; letter-spacing:8px; color:#ff6b9d; margin:4px 0; }
+  .code-sub   { color:#b08860; font-size:.78rem; }
+
+  /* ─── FLEX UTILS ───────────────────────────────────────────────────────── */
+  .flex-col  { display:flex; flex-direction:column; }
+  .flex-row  { display:flex; flex-direction:row; }
+  .gap-8  { gap:8px; }
+  .gap-12 { gap:12px; }
+  .gap-14 { gap:14px; }
+  .gap-16 { gap:16px; }
+  .mt-8  { margin-top:8px; }
+  .mt-12 { margin-top:12px; }
+  .mt-16 { margin-top:16px; }
+  .mt-20 { margin-top:20px; }
+  .mb-10 { margin-bottom:10px; }
+  .mb-14 { margin-bottom:14px; }
+  .mb-16 { margin-bottom:16px; }
+  .mb-18 { margin-bottom:18px; }
+
+  /* ─── MISC ─────────────────────────────────────────────────────────────── */
+  .text-pink   { color:#ff6b9d; }
+  .text-gold   { color:#b08860; }
+  .text-green  { color:#2d8a4a; }
+  .text-grey   { color:#aaa; }
+  .text-sm     { font-size:.85rem; }
+  .text-xs     { font-size:.75rem; }
+  .text-lg     { font-size:1.15rem; }
+  .fw-700      { font-weight:700; }
+  .fw-900      { font-weight:900; }
+  .center      { text-align:center; }
+  .italic      { font-style:italic; }
+
+  .spinner { animation: spin 1.2s linear infinite; display:inline-block; }
+
+  /* ─── SOLVED OVERLAY ───────────────────────────────────────────────────── */
+  .solved-banner {
+    text-align:center; padding:20px;
+    background: linear-gradient(135deg,#f0fff4,#e8f8e8);
+    border-radius:16px; border:2px solid #7ec8a455;
+  }
+
+  /* ─── FIREBASE NOT CONFIGURED ──────────────────────────────────────────── */
+  #config-warning {
+    position:fixed; inset:0; z-index:999;
+    background:rgba(0,0,0,0.85); display:flex;
+    align-items:center; justify-content:center; padding:20px;
+  }
+  .config-box {
+    background:#fff; border-radius:20px; padding:32px;
+    max-width:500px; width:100%;
+  }
+  .config-box h2 { color:#ff6b9d; margin-bottom:14px; }
+  .config-box ol { padding-left:20px; line-height:2; color:#444; }
+  .config-box code {
+    background:#f5f5f5; border-radius:6px;
+    padding:2px 7px; font-size:.85rem; color:#c97ef7;
+  }
+  .config-box a { color:#ff6b9d; }
+</style>
+</head>
+<body>
+
+<!-- ─── FIREBASE CONFIG WARNING ───────────────────────────────────────────── -->
+<div id="config-warning" style="display:none">
+  <div class="config-box">
+    <h2>🔧 Firebase Setup Required</h2>
+    <p style="color:#666;margin-bottom:16px;">To enable multiplayer, you need to connect this game to a free Firebase project. It takes about 3 minutes:</p>
+    <ol>
+      <li>Go to <a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a></li>
+      <li>Create a new project (free)</li>
+      <li>Go to <strong>Build → Realtime Database</strong> → Create database</li>
+      <li>Go to <strong>Project Settings → Your apps</strong> → Add web app</li>
+      <li>Copy the <code>firebaseConfig</code> object</li>
+      <li>Open this HTML file and paste it in the <code>firebaseConfig</code> section at the top</li>
+    </ol>
+    <p style="margin-top:14px;color:#888;font-size:.85rem;">Also set Realtime Database Rules to allow read/write while playing:<br>
+    <code>{ "rules": { ".read": true, ".write": true } }</code></p>
+  </div>
+</div>
+
+<!-- ─── BG LAYER ─────────────────────────────────────────────────────────── -->
+<div class="bg-layer" id="bg-layer"></div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     SCREEN: HOME
+═══════════════════════════════════════════════════════════════════════════ -->
+<div class="screen active" id="screen-home">
+  <div class="center-wrap">
+    <div class="hero">
+      <span class="hero-bunny">🐰</span>
+      <h1 class="hero-title">Easter Escape</h1>
+      <p class="hero-sub">Solve puzzles. Collect letters. Escape! 🥚</p>
+    </div>
+    <div class="card flex-col gap-14">
+      <button class="btn btn-pink" onclick="showPanel('host')">🏠 Host a New Game</button>
+      <button class="btn btn-orange" onclick="showPanel('join')">🚪 Join a Game</button>
+    </div>
+
+    <!-- Host panel -->
+    <div id="panel-host" class="card flex-col gap-12 mt-12" style="display:none">
+      <h3 class="text-pink text-lg">🎉 Create Game</h3>
+      <input id="host-name" type="text" placeholder="Your team name..." maxlength="24" oninput="clearErr('home-err')" onkeydown="if(event.key==='Enter')doHost()"/>
+      <p id="home-err" class="fb-error" style="display:none"></p>
+      <button class="btn btn-pink" onclick="doHost()">Create Game 🐣</button>
+      <button class="btn btn-grey btn-sm" style="width:auto;align-self:flex-start" onclick="showPanel(null)">← Back</button>
+    </div>
+
+    <!-- Join panel -->
+    <div id="panel-join" class="card flex-col gap-12 mt-12" style="display:none">
+      <h3 style="color:#ffb347" class="text-lg">🚪 Join Game</h3>
+      <input id="join-name" type="text" placeholder="Your team name..." maxlength="24" oninput="clearErr('home-err2')"/>
+      <input id="join-code" type="text" placeholder="Game code (e.g. ABC12)..." maxlength="6"
+             oninput="this.value=this.value.toUpperCase();clearErr('home-err2')"
+             onkeydown="if(event.key==='Enter')doJoin()"/>
+      <p id="home-err2" class="fb-error" style="display:none"></p>
+      <button class="btn btn-orange" onclick="doJoin()">Join Game 🥚</button>
+      <button class="btn btn-grey btn-sm" style="width:auto;align-self:flex-start" onclick="showPanel(null)">← Back</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     SCREEN: LOBBY
+═══════════════════════════════════════════════════════════════════════════ -->
+<div class="screen" id="screen-lobby">
+  <div class="center-wrap">
+    <div class="card">
+      <div class="center mb-18">
+        <div style="font-size:2.8rem;margin-bottom:4px">🐣</div>
+        <h2 class="text-pink" style="font-size:1.7rem">Waiting Room</h2>
+        <div class="code-display mt-12">
+          <p class="code-label">GAME CODE</p>
+          <p class="code-value" id="lobby-code-display">—</p>
+          <p class="code-sub">Share this with your friends!</p>
+        </div>
+      </div>
+
+      <p class="fw-700 text-grey text-xs mb-10" style="text-transform:uppercase">
+        Players Joined (<span id="lobby-count">0</span>)
+      </p>
+      <div id="lobby-players" class="flex-col gap-8 mb-16"></div>
+
+      <!-- Host controls -->
+      <div id="lobby-host-ctrl">
+        <button class="btn btn-pink" id="lobby-start-btn" onclick="doStart()" disabled>
+          Start Game 🐰
+        </button>
+        <p class="center text-grey text-xs mt-8">Wait for everyone to join before starting!</p>
+      </div>
+
+      <!-- Non-host waiting -->
+      <div id="lobby-wait" class="center" style="display:none;padding:14px;background:#fff9f0;border-radius:14px">
+        <span class="spinner" style="font-size:1.5rem">⏳</span>
+        <p class="text-gold text-sm mt-8">Waiting for host to start...</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     SCREEN: GAME
+═══════════════════════════════════════════════════════════════════════════ -->
+<div class="screen" id="screen-game" style="align-items:flex-start;padding:0">
+  <!-- Sticky header -->
+  <div id="game-header" style="width:100%">
+    <div class="header-inner">
+      <div>
+        <span class="header-title">🐰 Easter Escape</span>
+        <span class="header-code" id="hdr-code"></span>
+      </div>
+      <div class="flex-row gap-8">
+        <div class="badge badge-timer" id="hdr-timer">00:00</div>
+        <div class="badge badge-solved" id="hdr-solved">✅ 0/10</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="game-body" style="width:100%">
+
+    <!-- Letter tiles -->
+    <div class="card mb-16" style="padding:16px">
+      <p class="fw-700 text-grey text-xs mb-10" style="text-transform:uppercase">Collected Letters</p>
+      <div id="letter-tiles" class="flex-row gap-8" style="flex-wrap:wrap"></div>
+    </div>
+
+    <!-- Puzzle tabs -->
+    <div class="tabs-row mb-16" id="puzzle-tabs"></div>
+
+    <!-- Active puzzle card -->
+    <div class="card" id="puzzle-card"></div>
+
+    <!-- Leaderboard -->
+    <div id="leaderboard-wrap" class="mt-20" style="display:none">
+      <div class="card">
+        <h3 class="text-pink mb-14" style="font-size:1.1rem">🏆 Leaderboard</h3>
+        <div id="leaderboard-rows" class="flex-col gap-8"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     MAIN SCRIPT
+═══════════════════════════════════════════════════════════════════════════ -->
+<script>
+// ─── PUZZLE DATA ────────────────────────────────────────────────────────────
+const PUZZLES = [
+  { id:1, letter:"H", type:"long",  emoji:"💡", title:"The Switch Room",
+    q:"There are three light switches in one room and one lamp in another room. You can only enter the lamp room ONCE. How do you figure out which switch controls the lamp?",
+    a:"Turn on switch 1 for several minutes, then turn it off. Turn on switch 2. Enter the lamp room. If the lamp is on, switch 2 controls it. If it's off but warm, switch 1 controls it. If it's off and cold, switch 3 controls it.",
+    hint:"Think beyond just on and off – light bulbs have more than one detectable property.",
+    keywords:["warm","heat","temperature","switch 1","switch 2","switch 3"]
+  },
+  { id:2, letter:"E", type:"short", emoji:"🔤", title:"The Scrambled Letters",
+    q:"Rearrange the letters to find a valid English word: S I L E N T",
+    a:["listen","tinsel","enlist","inlets","silent"],
+    hint:"Think of something you do with your ears."
+  },
+  { id:3, letter:"P", type:"short", emoji:"🗺️", title:"The Riddle of Everywhere",
+    q:"I have cities, but no houses live there. I have mountains, but no trees grow there. I have water, but no fish swim there. I have roads, but no cars drive there. What am I?",
+    a:["a map","map"],
+    hint:"I show the world, but I am not the world."
+  },
+  { id:4, letter:"Å", type:"short", emoji:"🥚", title:"The Egg Doubler",
+    q:"The Easter Bunny hides eggs in a garden. On day 1 he hides 2 eggs. Each following day he hides double the amount of the day before. After 6 days, how many eggs has he hidden in total?",
+    a:["126"],
+    hint:"Think exponential growth – each day doubles the previous day's count."
+  },
+  { id:5, letter:"S", type:"short", emoji:"🐑", title:"The Sheep Trick",
+    q:"A farmer has 17 sheep. All but 9 die. How many sheep does he have left?",
+    a:["9","nine"],
+    hint:"Read every single word very carefully. The answer is hiding in plain sight."
+  },
+  { id:6, letter:"K", type:"short", emoji:"⏳", title:"The Invisible Force",
+    q:"I am always in front of you but cannot be seen. I can be wasted or saved, but never bought back. I have no shape, no colour, no sound. What am I?",
+    a:["time","the future","future"],
+    hint:"Everyone has exactly the same amount of me each day."
+  },
+  { id:7, letter:"E", type:"long",  emoji:"📦", title:"The Mislabelled Boxes",
+    q:"You have three Easter egg boxes: one filled with chocolate eggs, one with candy eggs, and one empty. The labels say 'Chocolate', 'Candy', and 'Empty' – but EVERY label is wrong. You may reach into ONE box and pull out ONE egg without looking inside first. Which box do you pick from, and how do you correctly label all three?",
+    a:"Pick from the box labelled Empty. Since all labels are wrong, it must contain chocolate or candy. Whatever you pull out is what that box contains. The box labelled Chocolate must be candy or empty – since Empty is identified, it must be candy. The box labelled Candy must therefore be empty.",
+    hint:"The wrongly labelled 'Empty' box is your key starting point – work from there.",
+    keywords:["empty","chocolate","candy","label","wrong","pick"]
+  },
+  { id:8, letter:"A", type:"short", emoji:"✉️", title:"The 8-Letter Mystery",
+    q:"What 8-letter word has one letter in it?",
+    a:["envelope","an envelope"],
+    hint:"The answer is something you send, not something you say."
+  },
+  { id:9, letter:"R", type:"short", emoji:"🔢", title:"The Number Pattern",
+    q:"Find the next number in the sequence: 2, 6, 12, 20, 30, ?",
+    a:["42"],
+    hint:"Try multiplying consecutive whole numbers instead of just adding."
+  },
+  { id:10, letter:"N", type:"short", emoji:"👣", title:"The Paradox",
+    q:"The more you take, the more you leave behind. What am I?",
+    a:["footsteps","steps","a footstep","foot steps"],
+    hint:"The more you do it, the more you leave a trace – but the trace is not something you can pick up."
+  }
+];
+
+const SCRAMBLED = ["E","R","H","Å","N","P","K","A","S","E"];
+const SOLUTION  = "påskeharen";
+
+// ─── BACKGROUND ──────────────────────────────────────────────────────────────
+(function buildBg() {
+  const emojis = ["🌸","🌷","🐣","🥚","🌼","🐰","🌸","🌷","🥚","🌸","🌼","🐣"];
+  const layer = document.getElementById("bg-layer");
+  emojis.forEach((e, i) => {
+    const d = document.createElement("div");
+    d.className = "bg-emoji";
+    d.textContent = e;
+    d.style.cssText = `left:${(i*9+4)%94}%;top:${(i*11+7)%87}%;font-size:${1.4+(i%3)*0.7}rem;animation-duration:${4+i*0.6}s;animation-delay:${i*0.35}s`;
+    layer.appendChild(d);
+  });
+})();
+
+// ─── STATE ────────────────────────────────────────────────────────────────────
+let STATE = {
+  gameCode: "", teamName: "", isHost: false, startTime: null,
+  solved: [], hints: [], escaped: false, activePuzzle: 0,
+  timerInterval: null, lbInterval: null, lobbyUnsub: null
+};
+
+// ─── FIREBASE WRAPPERS ────────────────────────────────────────────────────────
+function fb() { return window._fb; }
+
+async function fbGet(path) {
+  const snap = await fb().get(fb().ref(fb().db, path));
+  return snap.exists() ? snap.val() : null;
+}
+async function fbSet(path, val) {
+  return fb().set(fb().ref(fb().db, path), val);
+}
+async function fbUpdate(path, val) {
+  return fb().update(fb().ref(fb().db, path), val);
+}
+function fbListen(path, cb) {
+  const r = fb().ref(fb().db, path);
+  return fb().onValue(r, snap => cb(snap.exists() ? snap.val() : null));
+}
+
+// ─── SCREEN HELPERS ──────────────────────────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.getElementById("screen-" + id).classList.add("active");
+}
+function showPanel(name) {
+  ["host","join"].forEach(p => {
+    document.getElementById("panel-"+p).style.display = (name===p) ? "flex" : "none";
+  });
+}
+function showErr(id, msg) {
+  const el = document.getElementById(id);
+  el.textContent = msg; el.style.display = "block";
+}
+function clearErr(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = "none";
+}
+
+// ─── HOME ACTIONS ─────────────────────────────────────────────────────────────
+async function doHost() {
+  const name = document.getElementById("host-name").value.trim();
+  if (!name) return showErr("home-err","Enter your team name!");
+  const code = Math.random().toString(36).substring(2,7).toUpperCase();
+  await fbSet(`games/${code}`, {
+    code, started: false, startTime: null, createdAt: Date.now(),
+    players: { [sanitize(name)]: { name, joinedAt: Date.now() } }
+  });
+  STATE.gameCode = code; STATE.teamName = name; STATE.isHost = true;
+  enterLobby();
+}
+
+async function doJoin() {
+  const name = document.getElementById("join-name").value.trim();
+  const code = document.getElementById("join-code").value.trim().toUpperCase();
+  if (!name || !code) return showErr("home-err2","Fill in both fields!");
+  const game = await fbGet(`games/${code}`);
+  if (!game) return showErr("home-err2","Game not found! Check the code.");
+  if (game.started) return showErr("home-err2","This game has already started!");
+  await fbUpdate(`games/${code}/players`, { [sanitize(name)]: { name, joinedAt: Date.now() } });
+  STATE.gameCode = code; STATE.teamName = name; STATE.isHost = false;
+  enterLobby();
+}
+
+function sanitize(s) { return s.replace(/[^a-zA-Z0-9_\-]/g,"_"); }
+
+// ─── LOBBY ────────────────────────────────────────────────────────────────────
+function enterLobby() {
+  document.getElementById("lobby-code-display").textContent = STATE.gameCode;
+  document.getElementById("lobby-host-ctrl").style.display = STATE.isHost ? "block" : "none";
+  document.getElementById("lobby-wait").style.display = STATE.isHost ? "none" : "block";
+  showScreen("lobby");
+
+  STATE.lobbyUnsub = fbListen(`games/${STATE.gameCode}`, game => {
+    if (!game) return;
+    renderLobbyPlayers(game.players || {});
+    if (game.started && game.startTime) {
+      if (STATE.lobbyUnsub) STATE.lobbyUnsub();
+      STATE.startTime = game.startTime;
+      enterGame();
+    }
+  });
+}
+
+function renderLobbyPlayers(players) {
+  const colors = ["#ff6b9d","#ffb347","#7ec8a4","#7eb8f7","#c97ef7","#f7b7a3"];
+  const list = Object.values(players).sort((a,b)=>a.joinedAt-b.joinedAt);
+  const wrap = document.getElementById("lobby-players");
+  wrap.innerHTML = "";
+  list.forEach((p,i) => {
+    const isMe = p.name === STATE.teamName;
+    const isHost = i === 0;
+    const c = colors[i % colors.length];
+    wrap.innerHTML += `
+      <div class="player-row" style="background:${c}18">
+        <div class="player-dot" style="background:${c}"></div>
+        <span class="fw-700" style="color:#444;flex:1">${esc(p.name)}</span>
+        ${isMe ? '<span class="text-xs text-grey">You</span>' : ""}
+        ${isHost ? `<span style="font-size:.72rem;background:#ff6b9d22;color:#ff6b9d;border-radius:8px;padding:2px 8px">Host</span>` : ""}
+      </div>`;
+  });
+  document.getElementById("lobby-count").textContent = list.length;
+  const btn = document.getElementById("lobby-start-btn");
+  btn.disabled = list.length < 1;
+  btn.textContent = `Start Game (${list.length} team${list.length!==1?"s":""}) 🐰`;
+}
+
+async function doStart() {
+  const startTime = Date.now();
+  await fbUpdate(`games/${STATE.gameCode}`, { started: true, startTime });
+}
+
+// ─── GAME ─────────────────────────────────────────────────────────────────────
+function enterGame() {
+  showScreen("game");
+  document.getElementById("hdr-code").textContent = "#" + STATE.gameCode;
+  buildLetterTiles();
+  buildTabs();
+  renderPuzzle(0);
+  startTimer();
+  startLbPoll();
+}
+
+function startTimer() {
+  if (STATE.timerInterval) clearInterval(STATE.timerInterval);
+  STATE.timerInterval = setInterval(() => {
+    if (STATE.escaped) return;
+    const s = Math.floor((Date.now() - STATE.startTime) / 1000);
+    document.getElementById("hdr-timer").textContent = fmtTime(s);
+  }, 500);
+}
+
+function startLbPoll() {
+  if (STATE.lbInterval) clearInterval(STATE.lbInterval);
+  renderLeaderboard();
+  STATE.lbInterval = setInterval(renderLeaderboard, 5000);
+}
+
+async function renderLeaderboard() {
+  const data = await fbGet(`leaderboards/${STATE.gameCode}`);
+  if (!data) return;
+  const entries = Object.values(data).sort((a,b) => {
+    if (a.escaped && !b.escaped) return -1;
+    if (!a.escaped && b.escaped) return 1;
+    if (a.escaped && b.escaped) return a.time - b.time;
+    return (b.solved - b.hints*0.5) - (a.solved - a.hints*0.5);
+  });
+  const wrap = document.getElementById("leaderboard-wrap");
+  const rows = document.getElementById("leaderboard-rows");
+  wrap.style.display = "block";
+  rows.innerHTML = "";
+  const medals = ["🥇","🥈","🥉"];
+  entries.forEach((e,i) => {
+    const isMe = e.name === STATE.teamName;
+    rows.innerHTML += `
+      <div class="lb-row${isMe?" me":""}">
+        <span style="font-size:1.2rem">${medals[i]||`${i+1}.`}</span>
+        <div style="flex:1">
+          <div class="fw-700" style="font-size:.95rem">${esc(e.name)}</div>
+          <div class="text-xs text-grey">
+            ${e.escaped ? `⏱ ${fmtTime(e.time)}` : `✅ ${e.solved} solved`}
+            ${e.hints>0 ? ` · 💡 ${e.hints} hint${e.hints!==1?"s":""}` : ""}
+          </div>
+        </div>
+        ${e.escaped ? '<span style="font-size:.72rem;background:#f0fff4;color:#2d8a4a;border-radius:8px;padding:3px 8px;font-weight:700">ESCAPED</span>' : ""}
+      </div>`;
+  });
+}
+
+// ─── LETTER TILES ─────────────────────────────────────────────────────────────
+function buildLetterTiles() {
+  const wrap = document.getElementById("letter-tiles");
+  wrap.innerHTML = PUZZLES.map((p,i) =>
+    `<div class="letter-tile" id="tile-${p.id}">?</div>`
+  ).join("");
+}
+
+function refreshLetterTiles() {
+  PUZZLES.forEach(p => {
+    const tile = document.getElementById("tile-"+p.id);
+    if (!tile) return;
+    if (STATE.solved.includes(p.id)) {
+      tile.textContent = p.letter;
+      tile.classList.add("unlocked");
+    }
+  });
+  document.getElementById("hdr-solved").textContent = `✅ ${STATE.solved.length}/10`;
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+function buildTabs() {
+  const wrap = document.getElementById("puzzle-tabs");
+  wrap.innerHTML = [...PUZZLES.map((p,i) => ({emoji:p.emoji,idx:i,pid:p.id})),
+    {emoji:"🔓",idx:10,pid:null}].map(t => `
+    <button class="tab-btn${t.idx===0?" active":""}" id="tab-${t.idx}" onclick="switchTab(${t.idx})">
+      ${t.emoji}
+    </button>`).join("");
+}
+
+function switchTab(idx) {
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+  const btn = document.getElementById("tab-"+idx);
+  if (btn) btn.classList.add("active");
+  STATE.activePuzzle = idx;
+  renderPuzzle(idx);
+}
+
+function refreshTabs() {
+  PUZZLES.forEach((p,i) => {
+    const btn = document.getElementById("tab-"+i);
+    if (!btn) return;
+    if (STATE.solved.includes(p.id)) {
+      btn.classList.add("solved");
+      if (!btn.querySelector(".tab-check"))
+        btn.innerHTML += `<span class="tab-check">✓</span>`;
+    }
+  });
+  // final tab
+  if (STATE.escaped) {
+    const btn = document.getElementById("tab-10");
+    if (btn) {
+      btn.classList.add("solved");
+      if (!btn.querySelector(".tab-check"))
+        btn.innerHTML += `<span class="tab-check">✓</span>`;
+    }
+  }
+}
+
+// ─── PUZZLE RENDER ────────────────────────────────────────────────────────────
+function renderPuzzle(idx) {
+  const card = document.getElementById("puzzle-card");
+  if (idx < 10) {
+    const p = PUZZLES[idx];
+    const solved = STATE.solved.includes(p.id);
+    const hintUsed = STATE.hints.includes(p.id);
+    card.innerHTML = `
+      <div class="mb-18">
+        <div class="flex-row gap-8" style="align-items:center;margin-bottom:4px">
+          <span style="font-size:1.6rem">${p.emoji}</span>
+          <div>
+            <h3 style="margin:0;color:#333;font-size:1.15rem">${p.title}</h3>
+            <p style="margin:0;font-size:.72rem;color:#aaa">Puzzle ${idx+1} of 10 · Unlocks: <strong class="text-pink">${p.letter}</strong></p>
+          </div>
+        </div>
+      </div>
+      <div id="clucky-box"></div>
+      <div style="background:linear-gradient(135deg,#fff0f5,#fff9f0);border-radius:16px;padding:18px;border:1.5px solid #ffb34733;margin-bottom:14px">
+        <p style="margin:0;color:#444;line-height:1.7;font-size:1rem">${p.q}</p>
+      </div>
+      ${solved ? `
+        <div class="solved-banner">
+          <div style="font-size:2.5rem;margin-bottom:8px">✅</div>
+          <p style="margin:0;color:#2d8a4a;font-weight:700">Solved! Letter unlocked: <span style="font-size:1.4rem;color:#ff6b9d">${p.letter}</span></p>
+        </div>` : `
+        <div class="flex-col gap-12">
+          ${p.type==="long"
+            ? `<textarea id="ans-input" placeholder="Type your detailed answer here..."></textarea>`
+            : `<input id="ans-input" type="text" placeholder="Your answer..." onkeydown="if(event.key==='Enter')submitAnswer(${idx})">`}
+          <div id="ans-feedback"></div>
+          <div class="flex-row gap-8" style="flex-wrap:wrap">
+            <button class="btn btn-pink" style="flex:1" onclick="submitAnswer(${idx})" id="submit-btn">Submit Answer 🥚</button>
+            ${!hintUsed ? `<button class="btn btn-orange btn-sm" onclick="useHint(${idx})">💡 Hint</button>` : ""}
+          </div>
+          ${hintUsed ? `<div class="hint-box">💡 <strong>Hint:</strong> ${p.hint}</div>` : `<div id="hint-reveal"></div>`}
+        </div>`}
+    `;
+  } else {
+    renderFinalPuzzle();
+  }
+}
+
+function renderFinalPuzzle() {
+  const card = document.getElementById("puzzle-card");
+  const escaped = STATE.escaped;
+
+  // Build letter display
+  const letterMap = [4,8,2,5,1,0,6,7,3,9]; // maps SCRAMBLED index → PUZZLES index
+  const letterHtml = SCRAMBLED.map((letter, i) => {
+    const puzzleIdx = letterMap[i];
+    const puzzle = PUZZLES[puzzleIdx];
+    const isUnlocked = STATE.solved.includes(puzzle.id);
+    return `<div class="letter-tile${isUnlocked?" unlocked":""}" style="width:40px;height:44px;font-size:1.3rem">${isUnlocked?letter:"?"}</div>`;
+  }).join("");
+
+  const missing = PUZZLES.filter(p => !STATE.solved.includes(p.id)).length;
+
+  card.innerHTML = `
+    <div class="mb-18">
+      <div class="flex-row gap-8" style="align-items:center;margin-bottom:4px">
+        <span style="font-size:1.6rem">🔓</span>
+        <div>
+          <h3 style="margin:0;color:#333;font-size:1.15rem">The Final Escape</h3>
+          <p style="margin:0;font-size:.72rem;color:#aaa">Use all your letters to break free!</p>
+        </div>
+      </div>
+    </div>
+    <div id="clucky-box-final"></div>
+    <div style="background:linear-gradient(135deg,#fff0f5,#fff9f0);border-radius:16px;padding:18px;border:1.5px solid #ffb34733;margin-bottom:14px">
+      <p style="margin:0 0 14px;color:#444;font-size:1rem;line-height:1.6">
+        You have collected letters throughout the escape room. Rearrange ALL of them to reveal the hidden word and break free! 🐰
+      </p>
+      <div class="flex-row gap-8" style="flex-wrap:wrap;margin-bottom:8px">${letterHtml}</div>
+      ${missing>0 ? `<p style="margin:0;color:#b08860;font-size:.78rem">🔒 ${missing} letter${missing!==1?"s":""} still locked – solve more puzzles!</p>` : ""}
+    </div>
+    ${escaped ? `
+      <div class="solved-banner">
+        <div style="font-size:3rem;margin-bottom:8px">🎉🐰🎉</div>
+        <p style="margin:0;color:#2d8a4a;font-weight:700;font-size:1.2rem">YOU ESCAPED!</p>
+      </div>` : `
+      <div class="flex-col gap-12">
+        <input id="final-input" type="text" placeholder="What's the secret word?" onkeydown="if(event.key==='Enter')submitFinal()">
+        <div id="final-feedback"></div>
+        <button class="btn btn-purple" onclick="submitFinal()" id="final-btn">Submit Final Answer 🔓</button>
+      </div>`}
+  `;
+}
+
+// ─── ANSWER CHECKING ──────────────────────────────────────────────────────────
+let attemptCounts = {};
+
+async function submitAnswer(idx) {
+  const p = PUZZLES[idx];
+  const inputEl = document.getElementById("ans-input");
+  const answer = inputEl ? inputEl.value.trim() : "";
+  if (!answer) return;
+
+  const btn = document.getElementById("submit-btn");
+  if (btn) { btn.disabled = true; btn.textContent = "Checking... 🐣"; }
+
+  attemptCounts[p.id] = (attemptCounts[p.id]||0) + 1;
+  const attempt = attemptCounts[p.id];
+
+  let correct = false;
+  let feedbackMsg = "";
+
+  if (p.type === "long") {
+    const result = await checkLongAnswer(p.id, answer, p.a, p.keywords);
+    correct = result.correct;
+    feedbackMsg = result.feedback;
+  } else {
+    correct = p.a.some(a => a.toLowerCase() === answer.toLowerCase());
+    feedbackMsg = correct ? "Spot on!" : "Not quite right...";
+  }
+
+  const reaction = await getChickenReaction(correct, p.title, attempt);
+  const cluckyBox = document.getElementById("clucky-box");
+  if (cluckyBox) {
+    cluckyBox.innerHTML = `
+      <div class="clucky-bubble mb-16">
+        <span style="font-size:1.8rem">🐥</span>
+        <p class="clucky-text">${esc(reaction)}</p>
+      </div>`;
+  }
+
+  const fb = document.getElementById("ans-feedback");
+  if (fb) {
+    fb.innerHTML = `<div class="${correct?"fb-success":"fb-error"}">${esc(feedbackMsg)}</div>`;
+  }
+
+  if (correct) {
+    STATE.solved.push(p.id);
+    refreshLetterTiles();
+    refreshTabs();
+    // Re-render as solved after brief delay
+    setTimeout(() => renderPuzzle(idx), 800);
+  } else {
+    if (btn) { btn.disabled = false; btn.textContent = "Submit Answer 🥚"; }
+  }
+}
+
+async function submitFinal() {
+  const inputEl = document.getElementById("final-input");
+  const answer = inputEl ? inputEl.value.trim() : "";
+  if (!answer) return;
+
+  const btn = document.getElementById("final-btn");
+  if (btn) { btn.disabled = true; btn.textContent = "Checking... 🐣"; }
+
+  const correct = answer.toLowerCase() === SOLUTION;
+  const reaction = await getChickenReaction(correct, "The Final Escape", 1);
+
+  const clucky = document.getElementById("clucky-box-final");
+  if (clucky) {
+    clucky.innerHTML = `
+      <div class="clucky-bubble mb-16">
+        <span style="font-size:1.8rem">🐥</span>
+        <p class="clucky-text">${esc(reaction)}</p>
+      </div>`;
+  }
+
+  const fb = document.getElementById("final-feedback");
+  if (fb) {
+    fb.innerHTML = `<div class="${correct?"fb-success":"fb-error"}">
+      ${correct ? "INCREDIBLE! You escaped! 🎉" : esc("That's not right... rearrange those letters again!")}
+    </div>`;
+  }
+
+  if (correct) {
+    STATE.escaped = true;
+    clearInterval(STATE.timerInterval);
+    const finalTime = Math.floor((Date.now() - STATE.startTime) / 1000);
+    document.getElementById("hdr-timer").textContent = "🎉 ESCAPED!";
+    document.getElementById("hdr-timer").style.background = "#f0fff4";
+    document.getElementById("hdr-timer").style.color = "#2d8a4a";
+
+    const key = sanitize(STATE.teamName);
+    await window._fb.set(window._fb.ref(window._fb.db, `leaderboards/${STATE.gameCode}/${key}`), {
+      name: STATE.teamName, time: finalTime,
+      solved: STATE.solved.length + 1,
+      hints: STATE.hints.length, escaped: true
+    });
+
+    refreshTabs();
+    setTimeout(() => renderFinalPuzzle(), 600);
+    renderLeaderboard();
+  } else {
+    if (btn) { btn.disabled = false; btn.textContent = "Submit Final Answer 🔓"; }
+  }
+}
+
+function useHint(idx) {
+  const p = PUZZLES[idx];
+  STATE.hints.push(p.id);
+  const hintReveal = document.getElementById("hint-reveal");
+  if (hintReveal) {
+    hintReveal.innerHTML = `
+      <div class="hint-box">
+        💡 <strong>Hint:</strong> ${p.hint}
+        <p style="margin:6px 0 0;color:#cc8820;font-size:.72rem">⚠️ Using a hint will be noted on the leaderboard.</p>
+      </div>`;
+  }
+  // remove hint button
+  renderPuzzle(idx);
+}
+
+// ─── AI HELPERS ───────────────────────────────────────────────────────────────
+async function callClaude(prompt, system) {
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1000,
+        system,
+        messages: [{ role: "user", content: prompt }]
+      })
+    });
+    const data = await res.json();
+    return data.content?.map(b => b.text||"").join("") || "";
+  } catch { return ""; }
+}
+
+async function checkLongAnswer(puzzleId, userAnswer, correctAnswer, keywords) {
+  const system = `You are a strict but fair Easter-themed quiz judge.
+Check if the student's answer captures the ESSENTIAL LOGIC of the correct answer.
+Respond ONLY with valid JSON (no markdown): {"correct": true/false, "feedback": "short message"}
+Be strict: the core mechanism or insight must be present. Vague or partial answers are WRONG.`;
+  const prompt = `Correct answer essence: ${correctAnswer}
+Key concepts needed: ${keywords?.join(", ")||""}
+Student's answer: "${userAnswer}"
+Is the student's answer essentially correct?`;
+  try {
+    const raw = await callClaude(prompt, system);
+    const clean = raw.replace(/```json|```/g,"").trim();
+    return JSON.parse(clean);
+  } catch { return { correct: false, feedback: "Hmm, I couldn't process that. Try again!" }; }
+}
+
+async function getChickenReaction(correct, puzzleTitle, attempt) {
+  const system = `You are Clucky, a sarcastic but loveable Easter chick hosting an escape room.
+Funny, dramatic, loves egg puns. Keep it SHORT (1-2 sentences max).
+Correct: celebrate with egg/Easter puns. Wrong: dramatic but encouraging. Never mean.`;
+  const prompt = correct
+    ? `The player just solved "${puzzleTitle}"! React with joy. Attempt: ${attempt}`
+    : `The player got "${puzzleTitle}" wrong (attempt ${attempt}). React dramatically but keep them going.`;
+  try {
+    const r = await callClaude(prompt, system);
+    return r || (correct ? "🐣 Egg-cellent work! You cracked it!" : "🐥 Oh no... not quite! Keep going!");
+  } catch { return correct ? "🐣 Egg-cellent work! You cracked it!" : "🐥 Oh no... not quite! Keep going!"; }
+}
+
+// ─── UTILS ────────────────────────────────────────────────────────────────────
+function fmtTime(s) {
+  return `${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
+}
+function esc(s) {
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+// ─── WAIT FOR FIREBASE ────────────────────────────────────────────────────────
+window.addEventListener("fbReady", () => {
+  // Firebase ready!
+});
+
+// Fallback: if Firebase script fails entirely
+setTimeout(() => {
+  if (!window._fbReady) {
+    document.getElementById("config-warning").style.display = "flex";
+  }
+}, 3000);
+</script>
+</body>
+</html>
