@@ -532,8 +532,8 @@ function parseJSON(raw,fallback){
 }
 
 function aiLong(p,ans,cb){
-  var sys="You are a strict Easter-themed quiz judge. Check if the student captures the ESSENTIAL LOGIC of the correct answer. Respond ONLY with valid JSON (no markdown): {\"correct\":true/false,\"feedback\":\"short message\"}. Core mechanism must be present.";
-  var prompt="Correct answer: "+p.a+"\nKey concepts: "+(p.kw||[]).join(", ")+"\nStudent: \""+ans+"\"\nEssentially correct?";
+  var sys="You are a generous and friendly Easter-themed quiz judge. Accept the answer if the student clearly understands the core idea, even if phrased informally or incompletely. Only reject if the answer is clearly wrong or misses the key insight entirely. Respond ONLY with valid JSON, no markdown: {\"correct\":true,\"feedback\":\"encouraging message\"} or {\"correct\":false,\"feedback\":\"short helpful nudge\"}.";
+  var prompt="Reference answer: "+p.a+"\nKey ideas: "+(p.kw||[]).join(", ")+"\nStudent answer: \""+ans+"\"\nDoes the student show understanding of the core idea? Be generous.";
   callAI(sys,prompt,function(raw){
     var r=parseJSON(raw,{correct:false,feedback:"Couldn't check that. Try again!"});
     cb(r.correct,r.feedback);
@@ -541,8 +541,8 @@ function aiLong(p,ans,cb){
 }
 
 function aiAnagram(ans,cb){
-  var sys="You are a strict anagram judge. The source phrase is URINATING OMEN. The intended answer is MOUNTAINEERING. Check if the student used exactly the same letters as URINATING OMEN (ignoring spaces and case). Also accept any other valid English word/phrase that is a true anagram. Respond ONLY with valid JSON (no markdown): {\"correct\":true/false,\"feedback\":\"short message\"}.";
-  var prompt="Student answered: \""+ans+"\"\nIs this a valid anagram of URINATING OMEN?";
+  var sys="You are an anagram judge. The puzzle asked players to rearrange the letters of URINATING OMEN. The correct intended answer is MOUNTAINEERING. Accept the answer if the student wrote mountaineering in any form (with or without spaces, any capitalisation). Also accept if they found another real known English word or phrase that is a valid anagram. Do NOT try to count or verify letters yourself. Respond ONLY with valid JSON, no markdown: {\"correct\":true,\"feedback\":\"short message\"} or {\"correct\":false,\"feedback\":\"short hint\"}.";
+  var prompt="Student answered: \""+ans+"\"\nIs this mountaineering or another valid anagram of URINATING OMEN?";
   callAI(sys,prompt,function(raw){
     var r=parseJSON(raw,{correct:false,feedback:"Couldn't check that. Try again!"});
     cb(r.correct,r.feedback);
